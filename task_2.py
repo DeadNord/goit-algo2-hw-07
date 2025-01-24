@@ -1,7 +1,7 @@
 import logging
 from colorama import init, Fore
 import sys
-import time
+import timeit
 from functools import lru_cache
 import matplotlib.pyplot as plt
 from tabulate import tabulate
@@ -30,45 +30,31 @@ class LruFibSystem:
 
 
 # ======================================
-# 2. Класи для Splay-дерева (більш схожі на приклад)
+# 2. Класи для Splay-дерева
 # ======================================
 class Node:
-    """
-    Вузол Splay-дерева. Зберігає data (Fibonacci index)
-    + value (fib(n)) + parent, left_node, right_node.
-    """
-
     def __init__(self, data, value, parent=None):
-        self.data = data
-        self.value = value
+        self.data = data  # n
+        self.value = value  # fib(n)
         self.parent = parent
         self.left_node = None
         self.right_node = None
 
 
 class SplayTree:
-    """
-    Реалізація Splay-дерева для кешу Fibonacci:
-      data = n (індекс),
-      value = fib(n).
-    """
-
     def __init__(self):
         self.root = None
 
     def insert(self, data, value):
-        """Вставка нового вузла (data, value)."""
         if self.root is None:
             self.root = Node(data, value)
         else:
             self._insert_node(data, value, self.root)
-        # Після вставки знайдемо новий вузол і splay його:
         node = self.find_node(data)
         if node:
             self._splay(node)
 
     def _insert_node(self, data, value, current_node):
-        """Рекурсивна вставка (data, value) у піддерево з коренем current_node."""
         if data < current_node.data:
             if current_node.left_node:
                 self._insert_node(data, value, current_node.left_node)
@@ -81,11 +67,6 @@ class SplayTree:
                 current_node.right_node = Node(data, value, current_node)
 
     def search(self, data):
-        """
-        Пошук елемента data (n) в дереві + splay.
-        Якщо знайдено => підтягуємо вузол у корінь і повертаємо value.
-        Якщо ні => повертаємо None.
-        """
         node = self.find_node(data)
         if node:
             self._splay(node)
@@ -93,7 +74,6 @@ class SplayTree:
         return None
 
     def find_node(self, data):
-        """Пошук вузла (без splay) для data."""
         node = self.root
         while node:
             if data < node.data:
@@ -105,7 +85,6 @@ class SplayTree:
         return None
 
     def _splay(self, node):
-        """Splay операція (підняти node у корінь)."""
         while node.parent is not None:
             parent = node.parent
             grandparent = parent.parent
@@ -133,7 +112,6 @@ class SplayTree:
                     self._rotate_right(grandparent)
 
     def _rotate_right(self, node):
-        """Права ротація вузла node."""
         left_child = node.left_node
         if left_child is None:
             return
@@ -151,7 +129,6 @@ class SplayTree:
         node.parent = left_child
 
     def _rotate_left(self, node):
-        """Ліва ротація вузла node."""
         right_child = node.right_node
         if right_child is None:
             return
@@ -173,23 +150,15 @@ class SplayTree:
 # 3. Fibonacci через SplayFibSystem
 # ======================================
 class SplayFibSystem:
-    """
-    Клас, що містить SplayTree для кешування fib(n).
-    root.data = n, root.value = fib(n).
-    """
-
     def __init__(self):
         self.tree = SplayTree()
-        # Вставимо базові (0->0, 1->1)
         self.tree.insert(0, 0)
         self.tree.insert(1, 1)
 
     def fibonacci_splay(self, n: int) -> int:
-        # Якщо вже маємо:
         val = self.tree.search(n)
         if val is not None:
             return val
-        # Інакше обчислюємо
         if n < 2:
             return n
         f1 = self.fibonacci_splay(n - 1)
@@ -204,51 +173,52 @@ class SplayFibSystem:
 # ======================================
 class FibComparison:
     """
-    Порівнюємо час виконання:
-      - LruFibSystem.fibonacci_lru(n)
-      - SplayFibSystem().fibonacci_splay(n)
-    для n у діапазоні [0..951] з кроком 50.
+    Порівнюємо час виконання fibonacci_lru vs fibonacci_splay
+    з використанням timeit.timeit().
     """
 
     def __init__(self):
+        # 0..950 (крок 50)
         self.ns = list(range(0, 951, 50))
         self.results_lru = []
         self.results_splay = []
 
-    def measure_lru_time(self, n: int, repeats=5) -> float:
+    def measure_lru_time(self, n: int, repeats=3) -> float:
         """
-        Прямий замір часу - кілька повторів (repeats).
+        Використовуємо timeit.timeit(...) з setup_code та stmt_code.
         """
-        start = time.time()
-        for _ in range(repeats):
-            LruFibSystem.fibonacci_lru(n)
-        end = time.time()
-        return (end - start) / repeats
+        setup_code = f"""\
+from __main__ import LruFibSystem
+"""
+        stmt_code = f"LruFibSystem.fibonacci_lru({n})"
+        total_time = 0.0
+        # Кілька повторів (для усереднення)
+        import timeit
 
-    def measure_splay_time(self, n: int, repeats=5) -> float:
+        total_time = timeit.timeit(stmt=stmt_code, setup=setup_code, number=repeats)
+        return total_time / repeats
+
+    def measure_splay_time(self, n: int, repeats=3) -> float:
         """
-        Для кожного заміру створюємо новий SplayFibSystem().
-        Виконуємо 'repeats' повторів, беремо середнє.
+        Використовуємо timeit.timeit(...) для SplayFibSystem,
+        кожен виклик створює новий SplayFibSystem()
         """
-        start = time.time()
-        for _ in range(repeats):
-            splay_fib = SplayFibSystem()
-            splay_fib.fibonacci_splay(n)
-        end = time.time()
-        return (end - start) / repeats
+        setup_code = f"""\
+from __main__ import SplayFibSystem
+fib_sys = SplayFibSystem()
+"""
+        stmt_code = f"fib_sys.fibonacci_splay({n})"
+        import timeit
+
+        total_time = timeit.timeit(stmt=stmt_code, setup=setup_code, number=repeats)
+        return total_time / repeats
 
     def run_comparison(self):
-        logger.info(Fore.GREEN + "=== Starting FibComparison ===")
-
-        # "Прогріємо" LruFibSystem хоч раз
-        # (примітка: не скидаємо кеш @lru_cache, він зберігається між викликами)
-        LruFibSystem.fibonacci_lru(1)
+        logger.info(Fore.GREEN + "=== Starting FibComparison with timeit ===")
 
         for n in self.ns:
             logger.info(Fore.BLUE + f"Measuring times for n={n}")
-            # LRU
             t_lru = self.measure_lru_time(n, repeats=3)
-            # Splay
             t_splay = self.measure_splay_time(n, repeats=3)
             self.results_lru.append(t_lru)
             self.results_splay.append(t_splay)
@@ -260,7 +230,7 @@ class FibComparison:
                 [n, f"{self.results_lru[i]:.8f}", f"{self.results_splay[i]:.8f}"]
             )
 
-        print("\nРезультати порівняння (середній час, сек):")
+        print("\nРезультати порівняння (timeit, середній час, сек):")
         print(
             tabulate(
                 table_data,
@@ -273,9 +243,9 @@ class FibComparison:
         plt.figure(figsize=(8, 5))
         plt.plot(self.ns, self.results_lru, marker="o", label="LRU Cache")
         plt.plot(self.ns, self.results_splay, marker="x", label="Splay Tree")
-        plt.title("Порівняння часу виконання для LRU Cache та Splay Tree")
+        plt.title("Порівняння часу (timeit) для LRU Cache та Splay Tree")
         plt.xlabel("Число Фібоначчі (n)")
-        plt.ylabel("Середній час виконання (сек)")
+        plt.ylabel("Середній час (сек)")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
