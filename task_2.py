@@ -193,7 +193,6 @@ from __main__ import LruFibSystem
         stmt_code = f"LruFibSystem.fibonacci_lru({n})"
         total_time = 0.0
         # Кілька повторів (для усереднення)
-        import timeit
 
         total_time = timeit.timeit(stmt=stmt_code, setup=setup_code, number=repeats)
         return total_time / repeats
